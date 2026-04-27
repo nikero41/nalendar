@@ -1,49 +1,42 @@
-use std::io;
+use clap::{Parser, Subcommand};
+use nalendar::{google::GoogleClient, tui::App};
 
-use crossterm::event::{self, Event, KeyEventKind};
-use ratatui::{
-    DefaultTerminal,
-    widgets::{Paragraph, Widget},
-};
-
-fn main() -> color_eyre::Result<()> {
-    color_eyre::install()?;
-    ratatui::run(|terminal| App::default().run(terminal))?;
-    Ok(())
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
 }
 
-#[derive(Debug, Default)]
-struct App {
-    exit: bool,
+#[derive(Subcommand, Debug)]
+enum Commands {
+    Auth,
+    Events,
 }
 
-impl App {
-    fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        while !self.exit {
-            let _ = terminal.draw(|frame| frame.render_widget::<&App>(self, frame.area()));
-            self.handle_event()?;
+#[tokio::main]
+async fn main() -> color_eyre::Result<()> {
+    let cli = Cli::parse();
+
+    match &cli.command {
+        Some(Commands::Auth) => {
+            let _google_client = GoogleClient::new().await;
         }
-        Ok(())
+        Some(Commands::Events) => {
+            println!("{} {}", "🪚", "🟩");
+            let google_client = GoogleClient::new().await.unwrap();
+            google_client.get_events().await;
+        }
+        None => {
+            color_eyre::install()?;
+            ratatui::run(|terminal| App::default().run(terminal))?;
+            let hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(move |panic_info| {
+                println!("{} {}: {:?}", "🪚", "panic_info", panic_info);
+                // let _ = restore(); // ignore any errors as we are already failing
+                hook(panic_info);
+            }));
+        }
     }
-
-    fn handle_event(&mut self) -> io::Result<()> {
-        match event::read()? {
-            // it's important to check that the event is a key press event as
-            // crossterm also emits key release and repeat events on Windows.
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.exit = true;
-            }
-            _ => {}
-        };
-        Ok(())
-    }
-}
-
-impl Widget for &App {
-    fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
-    where
-        Self: Sized,
-    {
-        Paragraph::new("Hello world!").render(area, buf);
-    }
+    Ok(())
 }
