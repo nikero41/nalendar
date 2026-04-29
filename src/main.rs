@@ -16,6 +16,7 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
     let cli = Cli::parse();
 
     match &cli.command {
@@ -27,7 +28,6 @@ async fn main() -> color_eyre::Result<()> {
             let _ = google_client.get_calendars().await;
         }
         None => {
-            color_eyre::install()?;
             ratatui::run(|terminal| App::default().run(terminal))?;
             let hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |panic_info| {
