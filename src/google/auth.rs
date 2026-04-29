@@ -3,7 +3,7 @@ use std::{
     io::Write,
 };
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::google::auth::oauth::oauth_prompt;
@@ -21,7 +21,6 @@ pub struct AuthTokenRaw {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(from = "AuthTokenRaw")]
 pub struct AuthToken {
     pub access_token: String,
     expires_at: DateTime<Utc>,
@@ -33,11 +32,10 @@ pub struct AuthToken {
 
 impl From<AuthTokenRaw> for AuthToken {
     fn from(raw: AuthTokenRaw) -> Self {
-        let expires_at = Utc::now().timestamp() as u64 + raw.expires_in;
-        println!("{} {}: {:?}", "🪚", "expires_at", expires_at);
+        let expires_in = Duration::new(raw.expires_in as i64, 0).unwrap();
         Self {
             access_token: raw.access_token,
-            expires_at: Utc::now(),
+            expires_at: Utc::now().checked_add_signed(expires_in).unwrap(),
             refresh_token: raw.refresh_token,
             scope: raw.scope,
             token_type: raw.token_type,
@@ -79,8 +77,10 @@ impl AuthToken {
     }
 
     pub fn should_refresh(&self) -> bool {
-        // self.expires_at < Utc::now().timestamp() as u64
-        false
+        self.expires_at
+            .signed_duration_since(Utc::now())
+            .num_seconds()
+            <= 0
     }
 
     pub async fn refresh(&mut self) {
@@ -98,9 +98,21 @@ impl AuthToken {
             .form(&params)
             .send()
             .await
-            .unwrap();
+            .expect("Failed to exchange auth code");
 
-        let _auth_token: Self = response.json().await.unwrap();
+        match response.json::<AuthTokenRaw>().await {
+            Ok(auth_token) => {
+                let auth_token = AuthToken::from(auth_token);
+                self.access_token = auth_token.access_token;
+                self.expires_at = auth_token.expires_at;
+                self.refresh_token = auth_token.refresh_token;
+                self.scope = auth_token.scope;
+                self.token_type = auth_token.token_type;
+                self.refresh_token_expires_in = auth_token.refresh_token_expires_in;
+                self.save();
+            }
+            Err(error) => panic!("🪚 error: {:?}", error),
+        };
     }
 }
 
