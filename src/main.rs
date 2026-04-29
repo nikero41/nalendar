@@ -11,7 +11,7 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Commands {
     Auth,
-    Events,
+    Calendar,
 }
 
 #[tokio::main]
@@ -22,17 +22,15 @@ async fn main() -> color_eyre::Result<()> {
         Some(Commands::Auth) => {
             let _google_client = GoogleClient::new().await;
         }
-        Some(Commands::Events) => {
-            println!("{} {}", "🪚", "🟩");
+        Some(Commands::Calendar) => {
             let google_client = GoogleClient::new().await.unwrap();
-            google_client.get_events().await;
+            let _ = google_client.get_calendars().await;
         }
         None => {
             color_eyre::install()?;
             ratatui::run(|terminal| App::default().run(terminal))?;
             let hook = std::panic::take_hook();
             std::panic::set_hook(Box::new(move |panic_info| {
-                println!("{} {}: {:?}", "🪚", "panic_info", panic_info);
                 // let _ = restore(); // ignore any errors as we are already failing
                 hook(panic_info);
             }));
