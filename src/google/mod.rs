@@ -1,11 +1,10 @@
 use std::io;
 
-use url::Url;
-
 use crate::google::auth::AuthToken;
 
 pub mod auth;
 
+#[derive(Debug)]
 pub struct GoogleClient {
     auth_token: AuthToken,
 }
@@ -16,20 +15,18 @@ impl GoogleClient {
         Ok(Self { auth_token })
     }
 
-    pub async fn get_events(&self) {
+    pub async fn get_calendars(&self) -> Result<(), reqwest::Error> {
         let client = reqwest::Client::new();
 
-        let url =
-            Url::parse("https://www.googleapis.com/calendar/v3/users/me/calendarList").unwrap();
-
         let response = client
-            .get(url)
+            .get("https://www.googleapis.com/calendar/v3/users/me/calendarList")
             .bearer_auth(&self.auth_token.access_token)
             .send()
-            .await
-            .unwrap();
-        println!("{} {}: {:?}", "🪚", "response", response);
+            .await?;
+
         let result = response.json::<serde_json::Value>().await.unwrap();
         println!("{}", serde_json::to_string_pretty(&result).unwrap());
+
+        Ok(())
     }
 }
