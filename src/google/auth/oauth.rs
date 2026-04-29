@@ -1,12 +1,18 @@
-use std::io::{self, Write};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
 use axum::{Router, extract::Query, routing::get};
-use crossterm::{ExecutableCommand, cursor, event, style::Stylize, terminal};
+use crossterm::{event, style::Stylize};
 use serde::Deserialize;
 use tokio::sync::broadcast;
 use url::Url;
 
-use crate::google::auth::{AuthToken, Credentials};
+use crate::google::auth::{AuthToken, AuthTokenRaw, Credentials};
 
 const REDIRECT_URI: &str = "http://localhost:8080";
 
@@ -37,15 +43,15 @@ pub async fn oauth_prompt(credentials: &Credentials) -> AuthToken {
         "Or press {} to open the URL in your browser",
         "Enter".green()
     );
-    let mut stdout = io::stdout();
-    // let _ = stdout.execute(cursor::MoveTo(0, 0));
-    let _ = stdout.execute(terminal::Clear(terminal::ClearType::FromCursorDown));
-    let _ = stdout.flush();
 
     let server_handler = tokio::spawn(listen_for_code());
-    let open_browser_handler = tokio::spawn(async move {
-        loop {
-            if let Ok(event::Event::Key(key)) = event::read()
+
+    let flag = Arc::new(AtomicBool::new(false));
+    let flag_check = Arc::clone(&flag);
+    tokio::task::spawn_blocking(move || {
+        while !flag_check.load(Ordering::Relaxed) {
+            if event::poll(Duration::from_millis(101)).is_ok_and(|x| x)
+                && let Ok(event::Event::Key(key)) = event::read()
                 && key.code == event::KeyCode::Enter
             {
                 open::that(url.to_string()).unwrap();
@@ -53,14 +59,9 @@ pub async fn oauth_prompt(credentials: &Credentials) -> AuthToken {
         }
     });
 
-    match server_handler.await {
-        Ok(code) => {
-            
-            open_browser_handler.abort();
-            exchange_code(credentials, &code).await.unwrap()
-        }
-        Err(_) => panic!("Failed to listen for code"),
-    }
+    let code = server_handler.await.expect("Failed to listen for code");
+    flag.store(true, Ordering::Relaxed);
+    exchange_code(credentials, &code).await.unwrap()
 }
 
 #[derive(Debug, Deserialize)]
@@ -75,9 +76,9 @@ async fn listen_for_code() -> String {
         "/",
         get({
             let tx = tx.clone();
-            async move |Query(params): Query<CallbackParams>| -> String {
+            move |Query(params): Query<CallbackParams>| async move {
                 let _ = tx.send(params.code);
-                "You can go back to your terminal now. :)".to_string()
+                "You can go back to your terminal now. :)"
             }
         }),
     );
@@ -86,7 +87,6 @@ async fn listen_for_code() -> String {
         .await
         .unwrap();
 
-    let code_future = rx.recv();
     axum::serve(listener, server)
         .with_graceful_shutdown({
             let mut shutdown_rx = tx.subscribe();
@@ -97,7 +97,7 @@ async fn listen_for_code() -> String {
         .await
         .unwrap();
 
-    code_future.await.unwrap()
+    rx.recv().await.unwrap()
 }
 
 async fn exchange_code(credentials: &Credentials, code: &str) -> Result<AuthToken, reqwest::Error> {
@@ -116,5 +116,5 @@ async fn exchange_code(credentials: &Credentials, code: &str) -> Result<AuthToke
         .send()
         .await?;
 
-    Ok::<AuthToken, reqwest::Error>(response.json::<AuthToken>().await.unwrap())
+    response.json::<AuthTokenRaw>().await.map(|x| x.into())
 }
