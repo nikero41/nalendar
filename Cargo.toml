@@ -2,7 +2,12 @@
 name = "nalendar"
 version = "0.1.0"
 edition = "2024"
-description = "The modern calendar TUI"
+description = "Modern terminal calendar application"
+keywords = ["calendar", "terminal", "tui", "productivity"]
+categories = ["command-line-utilities"]
+repository = "https://github.com/nikero41/nalendar"
+homepage = "https://github.com/nikero41/nalendar"
+license = "MIT"
 
 [dependencies]
 ratatui = "0.30.0"
