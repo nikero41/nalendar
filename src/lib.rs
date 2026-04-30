@@ -1,4 +1,4 @@
 pub mod calendar;
-pub mod tui;
 pub mod google;
+pub mod tui;
 pub mod ui;
