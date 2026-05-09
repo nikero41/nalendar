@@ -1,6 +1,7 @@
 use crate::google::auth::AuthToken;
 
 mod auth;
+mod calendars;
 
 #[derive(Debug)]
 pub struct GoogleClient {
