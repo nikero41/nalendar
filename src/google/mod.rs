@@ -1,8 +1,6 @@
-use std::io;
-
 use crate::google::auth::AuthToken;
 
-pub mod auth;
+mod auth;
 
 #[derive(Debug)]
 pub struct GoogleClient {
@@ -10,23 +8,14 @@ pub struct GoogleClient {
 }
 
 impl GoogleClient {
-    pub async fn new() -> io::Result<Self> {
+    pub async fn new() -> Self {
         let auth_token = AuthToken::new().await;
-        Ok(Self { auth_token })
+        Self { auth_token }
     }
 
-    pub async fn get_calendars(&self) -> Result<(), reqwest::Error> {
-        let client = reqwest::Client::new();
-
-        let response = client
-            .get("https://www.googleapis.com/calendar/v3/users/me/calendarList")
-            .bearer_auth(&self.auth_token.access_token)
-            .send()
-            .await?;
-
-        let result = response.json::<serde_json::Value>().await.unwrap();
-        println!("{}", serde_json::to_string_pretty(&result).unwrap());
-
-        Ok(())
+    pub async fn setup(&mut self) {
+        if self.auth_token.should_refresh() {
+            self.auth_token.refresh().await;
+        }
     }
 }

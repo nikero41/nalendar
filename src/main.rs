@@ -20,8 +20,7 @@ async fn main() -> color_eyre::Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
-        Some(Commands::Auth) => {
-            let _google_client = GoogleClient::new().await;
+        Some(Commands::Auth) => GoogleClient::new().await.setup().await,
         }
         Some(Commands::Calendar) => {
             let google_client = GoogleClient::new().await.unwrap();
