@@ -3,11 +3,18 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Widget},
 };
 
+#[derive(Debug)]
 pub struct MonthView;
 
 impl MonthView {
     pub fn new() -> Self {
         Self {}
+    }
+}
+
+impl Default for MonthView {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -48,17 +55,6 @@ impl Widget for &MonthView {
                 .render(day_area, buf);
         });
     }
-}
-
-#[derive(Debug)]
-enum Day {
-    Monday,
-    Tuesday,
-    Wednesday,
-    Thursday,
-    Friday,
-    Saturday,
-    Sunday,
 }
 
 fn header_view(area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {

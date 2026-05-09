@@ -11,6 +11,12 @@ impl Sidebar {
     }
 }
 
+impl Default for Sidebar {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Widget for &Sidebar {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer)
     where
